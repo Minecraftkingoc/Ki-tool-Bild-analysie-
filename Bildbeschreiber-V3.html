@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bildbeschreiber V3 - klassische Bildanalyse</title>
+<style>
+  :root{--bg:#0f1216;--card:#171c23;--card2:#1d242e;--txt:#e8edf2;--mut:#93a1b1;--acc:#4da3ff;--acc2:#2f7fd6;--ok:#4cc38a;--warn:#e6b455;--err:#e06c6c;--brd:#2a3340}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding:24px 16px}
+  main{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+  header{max-width:880px;margin:0 auto 18px}
+  h1{font-size:1.5rem;margin-bottom:4px}
+  .sub{color:var(--mut);font-size:.92rem;line-height:1.5}
+  .badge{display:inline-block;background:#12321f;color:#7fd7a5;border:1px solid #1e5236;border-radius:999px;padding:2px 10px;font-size:.75rem;margin-top:8px;margin-right:6px}
+  .badge.warn{background:#33260f;color:#e6b455;border-color:#5a431a}
+  .card{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:18px}
+  .card h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:12px}
+  #dropzone{border:2px dashed var(--brd);border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;color:var(--mut);transition:.15s}
+  #dropzone:hover,#dropzone.drag{border-color:var(--acc);color:var(--txt);background:var(--card2)}
+  #preview{max-width:100%;max-height:340px;border-radius:8px;margin-top:12px;display:none}
+  #fileInfo{font-size:.82rem;color:var(--mut);margin-top:8px;display:none;line-height:1.5}
+  label{display:block;font-weight:600;margin-bottom:6px}
+  .hint{color:var(--mut);font-size:.83rem;margin-bottom:8px;line-height:1.5}
+  textarea{width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--brd);border-radius:8px;padding:10px;font:inherit;font-size:.92rem;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--acc)}
+  .btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  button{background:var(--card2);color:var(--txt);border:1px solid var(--brd);border-radius:8px;padding:9px 14px;font:inherit;font-size:.88rem;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--acc)}
+  button.primary{background:var(--acc2);border-color:var(--acc2);font-weight:600}
+  button.primary:hover{background:var(--acc)}
+  .checks{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:.85rem;color:var(--mut)}
+  .checks label{display:flex;gap:6px;align-items:center;font-weight:400;cursor:pointer}
+  .checks input{accent-color:var(--acc)}
+  #counter{font-size:.8rem;color:var(--mut);margin-top:6px}
+  #output{white-space:pre-wrap;line-height:1.65;font-size:.95rem;margin-top:14px;display:none}
+  #output p{margin:10px 0}
+  #output ul{margin:6px 0 6px 20px}
+  #output li{margin:4px 0}
+  #warnings{margin-top:12px;display:none;background:#2a220f;border:1px solid #5a431a;border-radius:8px;padding:12px;font-size:.85rem;line-height:1.6}
+  #warnings strong{color:var(--warn)}
+  #formatCheck{margin-top:12px;display:none;background:#12321f;border:1px solid #1e5236;border-radius:8px;padding:12px;font-size:.85rem;line-height:1.6}
+  #debug{margin-top:14px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:14px;font-size:.82rem;display:none}
+  #debug table{border-collapse:collapse;margin:8px 0;width:100%}
+  #debug td{padding:3px 8px;border-bottom:1px solid var(--brd)}
+  #debug td:first-child{color:var(--mut);width:52%}
+  .pal{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  .pal div{display:flex;align-items:center;gap:6px;font-size:.78rem}
+  .pal span{width:22px;height:22px;border-radius:5px;border:1px solid var(--brd);display:inline-block}
+  .grid3{display:grid;grid-template-columns:repeat(3,70px);gap:4px;margin:8px 0}
+  .grid3 div{height:50px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#fff;text-shadow:0 1px 2px #000}
+  .grid3 .peak{outline:2px solid var(--acc)}
+  .note{font-size:.8rem;color:var(--mut);margin-top:10px;line-height:1.5}
+  .fixbox{background:#1a2317;border:1px solid #2e4a22;border-radius:10px;padding:14px;font-size:.86rem;line-height:1.6}
+  .fixbox strong{color:var(--ok)}
+  .fixbox ul{margin:6px 0 0 18px}
+  .fixbox li{margin:3px 0}
+  details{border:1px solid var(--brd);border-radius:8px;padding:12px}
+  summary{cursor:pointer;font-weight:600;font-size:.9rem}
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+  @media(max-width:640px){.cmp{grid-template-columns:1fr}}
+  .cmp div{border-radius:8px;padding:10px;font-size:.82rem;line-height:1.55}
+  .cmp .good{background:#12321f;border:1px solid #1e5236}
+  .cmp .bad{background:#2a1515;border:1px solid #5a2a2a}
+  .small{font-size:.8rem;color:var(--mut)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Lokaler Bildbeschreiber – klassische Bildanalyse</h1>
+  <div class="sub">Läuft zu 100 % im Browser, ohne KI-Modell, ohne API, ohne Key, ohne Cloud-Upload. Die Pixel-Analyse läuft vollständig lokal. Die Engine misst Farben, Kanten, zusammenhängende Farbflächen und Bildbereiche. Regelbasierte Szenenhinweise werden getrennt von bestätigten Nutzerangaben ausgegeben.</div>
+  <div><span class="badge">100 % lokal · keine Cloud-API</span><span class="badge">Klassische Computer Vision</span><span class="badge warn">Semantische Hinweise bleiben Vorschläge</span></div>
+</header>
+<main>
+  <section class="card fixbox">
+    <strong>Korrigiert gegenüber der letzten Version - weitergebaut, nicht neu angefangen:</strong>
+    <ul>
+      <li><strong>Kein Extra-Abschnitt mehr:</strong> Gesamtszene / Hauptmotiv-Analyse / Weitere Details / Bildqualität / Zusammenfassung sind entfernt. Es gibt nur noch: Intro, Besondere Merkmale, Umgebung, Schlusssatz.</li>
+      <li><strong>Keine erfundenen Kamera-Angaben mehr:</strong> Kein 50mm, kein f/5.6, keine Schärfentiefe, keine Nachbearbeitungs-Vermutung.</li>
+      <li><strong>Keine erfundenen Bauteile mehr:</strong> Kein Rumpf, kein Pantograph, keine Pfeiler, keine Fensterband-Analyse - nur was du als Motiv angibst.</li>
+      <li><strong>Messwerte bleiben getrennt:</strong> Farbpalette, Helligkeit und Kantenwerte stehen in Debug; Szenenhinweise werden separat gekennzeichnet.</li>
+      <li><strong>Keine Prüf-Klammern mehr in den Merkmalen:</strong> Kein (Nachweisbar: ...) mehr im Text. Die Prüfung läuft leise und zeigt höchstens einen Hinweis unter dem Text.</li>
+      <li><strong>Sicherheitskorrektur:</strong> Dynamische Texte werden vor HTML-Ausgabe escaped; lokale Bild-URLs werden beim Ersetzen freigegeben.</li>
+      <li><strong>Intro-Fehler korrigiert:</strong> Jetzt &bdquo;Auf dem Bild ist eine getigerte Hauskatze zu sehen, die ... sitzt.&ldquo; statt &bdquo;... sitzt zu sehen.&ldquo; oder doppeltem &bdquo;Auf dem Bild ist Auf dem Bild ist&ldquo;.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>1 · Bild laden</h2>
+    <div id="dropzone">
+      <div id="dzText">Bild hierher ziehen, per Strg+V einfügen oder durch Klick auswählen</div>
+      <img id="preview" alt="Vorschau">
+    </div>
+    <div id="fileInfo"></div>
+    <input type="file" id="file" accept="image/*" hidden>
+    <div class="btnrow"><button id="btnRemove">Bild entfernen</button><button id="btnClearAll">Alles leeren</button></div>
+  </section>
+
+  <section class="card">
+    <h2>2 · Motiv &amp; Merkmale</h2>
+    <label for="notes">Motiv und Merkmale</label>
+    <p class="hint">Erste Zeile = Hauptmotiv. Danach je Zeile <strong>Merkmal: Beschreibung</strong>. Eine Zeile mit <strong>Umgebung:</strong> wird als Umgebung übernommen. Zeilen ohne Doppelpunkt (z. B. &bdquo;Die Katze schaut in die Kamera.&ldquo;) werden als Schlusstext übernommen. Du kannst auch das fertige Gewollt-Beispiel direkt hierher kopieren - es wird sauber erkannt und nicht verdoppelt.</p>
+    <textarea id="notes" rows="8" placeholder="z. B.&#10;eine getigerte Hauskatze, die auf einem dicken Ast eines Baumes sitzt&#10;Fell: braun-grau mit schwarzen Tigerstreifen&#10;Augen: große, gelblich-grüne Augen&#10;Ohren: aufrecht und spitz&#10;Schwanz: lang, dunkel geringelt, nach unten hängend&#10;Umgebung: Baum mit dichter grüner Blätterkrone und blauem Himmel im Hintergrund&#10;Die Katze schaut direkt in die Kamera. Sie wirkt aufmerksam und neugierig."></textarea>
+    <div id="counter"></div>
+    <div class="checks">
+      <label><input type="checkbox" id="chkEmoji" checked> Emoji automatisch (nur 1x, nur wenn noch keins da ist)</label>
+      <label><input type="checkbox" id="chkHints"> Prüfhinweise unter dem Text zeigen</label>
+      <label><input type="checkbox" id="chkAutoEnv" checked> Umgebung aus Messwerten ergänzen, nur wenn du keine angibst</label>
+    </div>
+    <div class="btnrow">
+      <button id="btnExample">Beispiel (Katze) einfügen</button>
+      <button id="btnExampleTrain">Beispiel (Zug - aber im Gewollt-Format)</button>
+      <button id="btnRun" class="primary">Beschreibung erstellen</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>3 · Ergebnis - nur Gewollt-Format</h2>
+    <div class="btnrow" style="margin-top:0">
+      <button id="btnCopy">Text kopieren</button>
+      <button id="btnSave">Als .txt speichern</button>
+      <button id="btnSaveMd">Als .md speichern</button>
+      <button id="btnDebug">Technische Messwerte (Debug)</button>
+    </div>
+    <div id="output"></div>
+    <div id="autoEvidence" style="display:none;margin-top:14px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:12px;line-height:1.6"></div>
+    <div id="warnings"></div>
+    <div id="formatCheck"></div>
+    <div id="debug"></div>
+    <p class="note">Wichtig: Der Haupttext übernimmt weiterhin deine Motivangaben. Die automatische klassische Analyse liefert getrennte, vorsichtige Bildhinweise; sie ist kein trainiertes Objekterkennungsmodell. Nutzertexte werden sicher als Text ausgegeben.</p>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>Vergleich: Gewollt vs. Nicht-gewollt - was blockiert wird</summary>
+      <div class="cmp">
+        <div class="good"><strong>Gewollt - so soll es aussehen:</strong><br><br>Auf dem Bild ist eine getigerte Hauskatze zu sehen, die auf einem dicken Ast eines Baumes sitzt. 🐈<br><br><strong>Besondere Merkmale:</strong><br>* Fell: Braun-grau mit schwarzen Tigerstreifen.<br>* Augen: Große, gelblich-grüne Augen.<br>* Ohren: Aufrecht und spitz.<br>* Schwanz: Lang, dunkel geringelt und nach unten hängend.<br><br><strong>Umgebung:</strong> Baum mit dichter grüner Blätterkrone und blauem Himmel im Hintergrund.<br><br>Die Katze schaut direkt in die Kamera. Sie wirkt aufmerksam und neugierig. 🥰</div>
+        <div class="bad"><strong>Nicht-gewollt - wird nicht mehr erzeugt:</strong><br><br>1. Gesamtszene ... 2. Hauptmotiv: Tragender Rumpf / Pantograph / Pfeiler ... 3. Weitere Details: Farbgestaltung ... 4. Umgebung mit Terracotta-Braun ... 5. Bildqualität: 50mm f/5.6 ... mögliche digitale Nachbearbeitung ... 6. Zusammenfassung: ...<br><br>Blockiert sind u. a.: Gesamtszene, Hauptmotiv-Analyse, Weitere Details, Bildqualität, Zusammenfassung, 50mm, f/5.6, Schärfentiefe, Pantograph, Tragender Rumpf, &bdquo;Farbpalette wird von ... dominiert&ldquo;, &bdquo;hebt sich farblich ab&ldquo;, &bdquo;Nachweisbar im Bild (... %)&ldquo;.</div>
+      </div>
+      <p class="small" style="margin-top:10px">Wenn du ein Bild ohne eigene Motivangabe lädst, erzeugt das Tool bewusst keinen erfundenen Objektnamen. Es zeigt dann nur: Format + Hinweis, dass ohne Angabe keine Objekte benannt werden - plus die echten Messwerte in Debug.</p>
+    </details>
+  </section>
+</main>
+
+<script>
+"use strict";
+const dropzone=document.getElementById('dropzone'), dzText=document.getElementById('dzText'),
+      preview=document.getElementById('preview'), fileInput=document.getElementById('file'),
+      notes=document.getElementById('notes'), output=document.getElementById('output'),
+      debugEl=document.getElementById('debug'), warningsEl=document.getElementById('warnings'),
+      formatEl=document.getElementById('formatCheck'), fileInfoEl=document.getElementById('fileInfo'),
+      counterEl=document.getElementById('counter');
+const state={img:null,m:null,text:'',fileName:'',fileSize:0,objectUrl:''};
+debugEl.hidden=true;
+const autoEvidenceEl=document.getElementById('autoEvidence');
+
+/* ---------- Farbkonvertierung (aus Vorversion übernommen) ---------- */
+function rgbToHsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+  let h=0,s=0,l=(mx+mn)/2;
+  if(mx!==mn){
+    const d=mx-mn;
+    s=l>0.5?d/(2-mx-mn):d/(mx+mn);
+    if(mx===r)h=((g-b)/d+(g<b?6:0));
+    else if(mx===g)h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h*=60;
+  }
+  return [h,s,l];
+}
+function colorName(h,s,l){
+  if(l<0.13)return 'Schwarz';
+  if(l>0.9&&s<0.25)return 'Weiss';
+  if(s<0.12)return l>0.75?'Hellgrau':(l<0.35?'Dunkelgrau':'Grau');
+  if(h<15||h>=345)return l>0.7?'Rosa':'Rot';
+  if(h<45){if(l<0.4)return 'Braun';if(s<0.4&&l>0.65)return 'Beige';return 'Orange';}
+  if(h<68)return l>0.8?'Hellgelb':'Gelb';
+  if(h<95)return 'Gelbgruen';
+  if(h<150)return l<0.32?'Tannengruen':(l>0.62?'Hellgruen':'Gruen');
+  if(h<192)return 'Tuerkis';
+  if(h<262){if(l>0.62)return 'Himmelblau';if(l<0.3)return 'Dunkelblau';return 'Blau';}
+  if(h<300)return 'Violett';
+  if(h<345)return (s>0.4&&l>0.55)?'Pink':'Lila';
+  return 'Rot';
+}
+
+/* ---------- Farb-Vokabular fuer leisen Abgleich ---------- */
+const COLOR_MATCHERS=[
+  {name:'Schwarz',stems:['schwarz'],test:function(p){return p.l<0.16;}},
+  {name:'Weiss',stems:['weiss','weiß'],test:function(p){return p.l>0.87&&p.s<0.25;}},
+  {name:'Grau',stems:['grau'],test:function(p){return p.s<0.13&&p.l>=0.16&&p.l<=0.87;}},
+  {name:'Braun',stems:['braun'],test:function(p){return p.h>=15&&p.h<=48&&p.s>=0.18&&p.l>=0.12&&p.l<=0.58;}},
+  {name:'Beige / Sand',stems:['beige','sand','creme'],test:function(p){return p.h>=35&&p.h<=60&&p.s>=0.12&&p.s<=0.55&&p.l>0.65;}},
+  {name:'Rot',stems:['rot'],test:function(p){return (p.h<=12||p.h>=348)&&p.s>=0.35&&p.l>=0.2&&p.l<=0.72;}},
+  {name:'Orange',stems:['orange'],test:function(p){return p.h>12&&p.h<=42&&p.s>=0.45&&p.l>=0.45;}},
+  {name:'Gelb',stems:['gelb'],test:function(p){return p.h>=42&&p.h<=68&&p.s>=0.35&&p.l>=0.4;}},
+  {name:'Gruen',stems:['gruen','grün'],test:function(p){return p.h>=68&&p.h<=168&&p.s>=0.15;}},
+  {name:'Tuerkis',stems:['tuerkis','türkis'],test:function(p){return p.h>=168&&p.h<=192&&p.s>=0.15;}},
+  {name:'Blau',stems:['blau'],test:function(p){return p.h>=192&&p.h<=262&&p.s>=0.15;}},
+  {name:'Violett / Lila',stems:['violett','lila','purpur'],test:function(p){return p.h>=262&&p.h<=332&&p.s>=0.15;}},
+  {name:'Rosa / Pink',stems:['rosa','pink'],test:function(p){return (p.h>=332||p.h<=12)&&p.s>=0.15&&p.l>=0.55;}}
+];
+
+/* ---------- Analyse (aus Vorversion, unveraendert im Kern) ---------- */
+function analyze(img){
+  const maxSide=720;
+  const sc=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+  const w=Math.max(8,Math.round(img.naturalWidth*sc));
+  const h=Math.max(8,Math.round(img.naturalHeight*sc));
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+  const ctx=cv.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(img,0,0,w,h);
+  const data=ctx.getImageData(0,0,w,h).data;
+  const N=w*h;
+  const hs=new Float32Array(N),ss=new Float32Array(N),ls=new Float32Array(N),lum=new Float32Array(N);
+  const pal=new Map();
+  const cellL=new Float64Array(9),cellR=new Float64Array(9),cellG=new Float64Array(9),cellB=new Float64Array(9),cellN=new Float64Array(9);
+  let sumL=0,sumL2=0,skyTop=0,veg=0,warm=0,cool=0;
+  const topBand=Math.floor(h*0.35);
+  for(let y=0;y<h;y++){
+    const row=Math.min(2,(3*y/h)|0);
+    for(let x=0;x<w;x++){
+      const i=y*w+x,q=i*4;
+      const r=data[q],g=data[q+1],b=data[q+2];
+      const hsl=rgbToHsl(r,g,b); const hh=hsl[0],s2=hsl[1],l2=hsl[2];
+      hs[i]=hh;ss[i]=s2;ls[i]=l2;lum[i]=l2*255;
+      sumL+=l2;sumL2+=l2*l2;
+      const key=Math.round(hh/20)*100+Math.round(s2*4)*10+Math.round(l2*4);
+      let e=pal.get(key);
+      if(!e){e={c:0,r:0,g:0,b:0};pal.set(key,e);}
+      e.c++;e.r+=r;e.g+=g;e.b+=b;
+      const col=Math.min(2,(3*x/w)|0),ci=row*3+col;
+      cellL[ci]+=l2;cellR[ci]+=r;cellG[ci]+=g;cellB[ci]+=b;cellN[ci]++;
+      if(y<topBand&&hh>=188&&hh<=252&&s2>0.16&&l2>0.45)skyTop++;
+      if(hh>=68&&hh<=166&&s2>0.17&&l2>0.1&&l2<0.82)veg++;
+      if((hh<=70||hh>=330)&&s2>0.18)warm++;
+      if(hh>=190&&hh<=265&&s2>0.15)cool++;
+    }
+  }
+  const avgL=sumL/N, stdL=Math.sqrt(Math.max(0,sumL2/N-avgL*avgL));
+  const gradSum=new Float64Array(9),gradN=new Float64Array(9);
+  for(let y=0;y<h-1;y++){
+    const row=Math.min(2,(3*y/h)|0);
+    for(let x=0;x<w-1;x++){
+      const i=y*w+x;
+      const gm=Math.abs(lum[i+1]-lum[i])+Math.abs(lum[i+w]-lum[i]);
+      const ci=row*3+Math.min(2,(3*x/w)|0);
+      gradSum[ci]+=gm;gradN[ci]++;
+    }
+  }
+  let s1=0,s22=0,nl=0;
+  for(let y=1;y<h-1;y++){
+    for(let x=1;x<w-1;x++){
+      const i=y*w+x;
+      const v=4*lum[i]-lum[i-1]-lum[i+1]-lum[i-w]-lum[i+w];
+      s1+=v;s22+=v*v;nl++;
+    }
+  }
+  const sharp=s22/nl-(s1/nl)*(s1/nl);
+  const cells=[];
+  let bgR=0,bgG=0,bgB=0;
+  for(let i=0;i<9;i++){
+    const n=Math.max(1,cellN[i]);
+    cells.push({l:cellL[i]/n,r:cellR[i]/n,g:cellG[i]/n,b:cellB[i]/n,grad:gradSum[i]/Math.max(1,gradN[i])});
+    if(i!==4){bgR+=cells[i].r;bgG+=cells[i].g;bgB+=cells[i].b;}
+  }
+  bgR/=8;bgG/=8;bgB/=8;
+  let peak=4,best=-1;
+  for(let i=0;i<9;i++){
+    const c=cells[i];
+    const dist=Math.sqrt((c.r-bgR)*(c.r-bgR)+(c.g-bgG)*(c.g-bgG)+(c.b-bgB)*(c.b-bgB))/255;
+    c.score=c.grad+dist*60;
+    if(c.score>best){best=c.score;peak=i;}
+  }
+  const cc=cells[4];
+  const subjectDist=Math.sqrt((cc.r-bgR)*(cc.r-bgR)+(cc.g-bgG)*(cc.g-bgG)+(cc.b-bgB)*(cc.b-bgB))/255;
+  const byName=new Map();
+  for(const e of pal.values()){
+    const hsl2=rgbToHsl(e.r/e.c,e.g/e.c,e.b/e.c);
+    const nm=colorName(hsl2[0],hsl2[1],hsl2[2]);
+    let t=byName.get(nm);
+    if(!t){t={c:0,r:0,g:0,b:0};byName.set(nm,t);}
+    t.c+=e.c;t.r+=e.r;t.g+=e.g;t.b+=e.b;
+  }
+  const palette=[];
+  byName.forEach(function(t,name){palette.push({name:name,pct:t.c/N*100,r:t.r/t.c,g:t.g/t.c,b:t.b/t.c});});
+  palette.sort(function(a,b){return b.pct-a.pct;});
+  const paletteTop=palette.slice(0,6);
+  const orientation=w>h*1.05?'Querformat':(h>w*1.05?'Hochformat':'quadratisches Format');
+  const m={w:w,h:h,N:N,avgL:avgL,stdL:stdL,sharp:sharp,
+    skyPct:skyTop/N*100,vegPct:veg/N*100,warmPct:warm/N*100,coolPct:cool/N*100,
+    orientation:orientation,palette:paletteTop,cells:cells,peak:peak,subjectDist:subjectDist,
+    px:{hs:hs,ss:ss,ls:ls,lum:lum}};
+  m.texture=cells[peak].grad;
+  return m;
+}
+/* ---------- Klassische Szenenhinweise (keine ML-/KI-Modelle) ----------
+   Die Regeln liefern nur Kandidaten. Sie behaupten keine sichere Objektidentität. */
+function analyzeClassicalEvidence(m){
+  const w=m.w,h=m.h,N=m.N,hs=m.px.hs,ss=m.px.ss,ls=m.px.ls,lum=m.px.lum;
+  const mask=new Uint8Array(N);
+  let yellowCount=0;
+  for(let i=0;i<N;i++){
+    // Gelb-/Goldbereich in HSL; bewusst breit, aber mit Mindestsaettigung.
+    if(hs[i]>=35&&hs[i]<=68&&ss[i]>=0.32&&ls[i]>=0.24&&ls[i]<=0.92){mask[i]=1;yellowCount++;}
+  }
+  // Groesste zusammenhaengende gelbe Region (8er-Nachbarschaft).
+  const seen=new Uint8Array(N), queue=new Int32Array(N);
+  let best={area:0,minX:0,minY:0,maxX:0,maxY:0};
+  for(let start=0;start<N;start++){
+    if(!mask[start]||seen[start])continue;
+    let head=0,tail=0;queue[tail++]=start;seen[start]=1;
+    let minX=w,maxX=0,minY=h,maxY=0;
+    while(head<tail){
+      const i=queue[head++],x=i%w,y=(i/w)|0;
+      if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;
+        if(nx<0||ny<0||nx>=w||ny>=h)continue;
+        const ni=ny*w+nx;if(mask[ni]&&!seen[ni]){seen[ni]=1;queue[tail++]=ni;}
+      }
+    }
+    if(tail>best.area)best={area:tail,minX,minY,maxX,maxY};
+  }
+  const bw=best.maxX-best.minX+1,bh=best.maxY-best.minY+1;
+  const yellowArea=best.area/N,aspect=bw/Math.max(1,bh);
+  // Kantenorientierungen in oberen und unteren Bildzonen.
+  let topEdges=0,topHorizontal=0,bottomEdges=0,bottomDiagonal=0,midEdges=0;
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+    const i=y*w+x,gx=lum[i+1]-lum[i-1],gy=lum[i+w]-lum[i-w];
+    const mag=Math.abs(gx)+Math.abs(gy);if(mag<34)continue;
+    const ax=Math.abs(gx),ay=Math.abs(gy),horizontalEdge=ay>ax*1.5;
+    const diagonalEdge=ax>ay*0.35&&ay>ax*0.35;
+    if(y<h*0.4){topEdges++;if(horizontalEdge)topHorizontal++;}
+    if(y>h*0.55){bottomEdges++;if(diagonalEdge)bottomDiagonal++;}
+    if(y>h*0.25&&y<h*0.75)midEdges++;
+  }
+  const topHorizontalRatio=topHorizontal/Math.max(1,topEdges);
+  const bottomDiagonalRatio=bottomDiagonal/Math.max(1,bottomEdges);
+  const elongatedYellow=yellowArea>0.018&&aspect>1.45;
+  const overheadStructure=topEdges/(w*h*0.4)>0.018&&topHorizontalRatio>0.28;
+  const trackLikeStructure=bottomEdges/(w*h*0.45)>0.018&&bottomDiagonalRatio>0.18;
+  const denseMidStructure=midEdges/(w*h*0.5)>0.025;
+  let railScore=0;
+  if(elongatedYellow)railScore+=0.38;
+  if(overheadStructure)railScore+=0.25;
+  if(trackLikeStructure)railScore+=0.22;
+  if(denseMidStructure)railScore+=0.15;
+  const clues=[];
+  if(elongatedYellow)clues.push('große, langgestreckte gelbe Farbregion');
+  if(overheadStructure)clues.push('viele überwiegend waagerechte Kanten im oberen Bildbereich');
+  if(trackLikeStructure)clues.push('diagonal verlaufende Kanten im unteren Bildbereich');
+  if(denseMidStructure)clues.push('hohe Kanten- und Strukturmenge im mittleren Bildbereich');
+  let candidate='';
+  if(railScore>=0.68)candidate='Mögliche Bahnumgebung mit einem länglichen Fahrzeug';
+  else if(elongatedYellow)candidate='Große, längliche gelbe Objektregion';
+  return {candidate,score:Math.min(0.95,railScore),clues,yellowArea,aspect,topHorizontalRatio,bottomDiagonalRatio};
+}
+function renderClassicalEvidence(m){
+  const e=analyzeClassicalEvidence(m);
+  if(!e.candidate){autoEvidenceEl.style.display='none';return;}
+  const pct=Math.round(e.score*100);
+  autoEvidenceEl.innerHTML='<strong>Automatische klassische Bildhinweise – keine sichere Objekterkennung</strong><p>'+escapeHtml(e.candidate)+'</p><p>Regel-Score: '+pct+' % (heuristisch, keine statistisch kalibrierte Wahrscheinlichkeit)</p><ul>'+e.clues.map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul><p class="small">Diese Hinweise beruhen ausschließlich auf gemessenen Farbflächen und Kantenmustern. Sie dürfen nicht als bestätigte Objektidentität ausgegeben werden.</p>';
+  autoEvidenceEl.style.display='block';
+}
+
+function positionText(col,row){
+  if(col===1&&row===1)return 'ziemlich zentral in der Bildmitte';
+  const c=['eher links','mittig','eher rechts'][col];
+  const r=['im oberen Bereich','auf mittlerer Höhe','im unteren Bereich'][row];
+  return c+' '+r;
+}
+
+/* ---------- Helfer ---------- */
+function escapeHtml(value){return String(value??'').replace(/[&<>"\']/g,function(ch){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;", "\'":"&#39;"}[ch];});}
+const fmt1=function(n){return n.toFixed(1).replace('.',',');};
+const fmt0=function(n){return Math.round(n).toString();};
+const cap=function(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;};
+const hasEmoji=function(s){return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(s||'');};
+const EMOJI=[['katze','\uD83D\uDC08'],['hund','\uD83D\uDC15'],['vogel','\uD83D\uDC26'],['pferd','\uD83D\uDC0E'],['fisch','\uD83D\uDC1F'],['schmetterling','\uD83E\uDD8B'],['baum','\uD83C\uDF33'],['blume','\uD83C\uDF38'],['wald','\uD83C\uDF32'],['auto','\uD83D\uDE97'],['zug','\uD83D\uDE86'],['haus','\uD83C\uDFE0'],['berg','\u26F0\uFE0F'],['meer','\uD83C\uDF0A'],['sonnenuntergang','\uD83C\uDF05']];
+function emojiFor(t){
+  const lo=(t||'').toLowerCase();
+  for(let i=0;i<EMOJI.length;i++){if(lo.indexOf(EMOJI[i][0])!==-1)return EMOJI[i][1];}
+  return '';
+}
+function findColorsInText(text){
+  const t=(text||'').toLowerCase();
+  return COLOR_MATCHERS.filter(function(mm){return mm.stems.some(function(st){return t.indexOf(st)!==-1;});});
+}
+function pctFor(matcher,m){
+  const hs=m.px.hs,ss=m.px.ss,ls=m.px.ls;let c=0;
+  for(let i=0;i<m.N;i++){if(matcher.test({h:hs[i],s:ss[i],l:ls[i]}))c++;}
+  return c/m.N*100;
+}
+/* NEU: leise Pruefung - liefert nur Warnungen, kein Text im Hauptoutput */
+function checkFeatureSilent(val,m){
+  if(!m) return [];
+  const matchers=findColorsInText(val);
+  const warns=[];
+  matchers.forEach(function(mm){
+    const pct=pctFor(mm,m);
+    if(pct<0.2) warns.push(mm.name+' nur ca. '+fmt1(pct)+' % messbar');
+  });
+  return warns;
+}
+
+/* ---------- NEU: Parsen - versteht auch eingefuegtes Gewollt-Beispiel ---------- */
+function parseInput(raw){
+  const lines=(raw||'').split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean);
+  let subject='',envUser='';
+  const feats=[],free=[];
+  let inFeats=false;
+  lines.forEach(function(origLine){
+    let l=origLine;
+    let isBullet=/^[\*\-\u2022]\s+/.test(l);
+    if(isBullet) l=l.replace(/^[\*\-\u2022]\s+/,'');
+    if(/^besondere merkmale:?\s*$/i.test(l)){inFeats=true;return;}
+    if(/^umgebung:?\s*$/i.test(l)){inFeats=false;return;}
+    const envMatch=l.match(/^umgebung\s*[:\-\u2013]\s*(.+)$/i);
+    if(envMatch){envUser=envMatch[1].trim();inFeats=false;return;}
+    if(/^auf dem bild ist/i.test(l)){subject=l;inFeats=false;return;}
+    if(!subject){
+      // Erste Zeile ist fast immer das Motiv - ausser sie ist ein Merkmal mit Bullet
+      if(isBullet){
+        const fm0=l.match(/^(.{1,40}?)\s*[:\-\u2013]\s*(.+)$/);
+        if(fm0){feats.push({name:fm0[1].trim(),val:fm0[2].trim()});inFeats=true;return;}
+        feats.push({name:'',val:l});inFeats=true;return;
+      }
+      subject=l;inFeats=false;return;
+    }
+    const fm=l.match(/^(.{1,40}?)\s*[:\-\u2013]\s*(.+)$/);
+    if(fm){
+      const name=fm[1].trim(),val=fm[2].trim();
+      if(name.split(/\s+/).length<=4 && name.indexOf('.')===-1){
+        feats.push({name:name,val:val});inFeats=true;return;
+      }
+    }
+    // Saetze wie "Die Katze schaut ..." sind Schlusstext, keine Merkmale
+    if(/^(die|der|das|sie|er|es)\b/i.test(l) && /(schaut|wirkt|liegt|sitzt|steht|ist|blickt|scheint)\b/i.test(l)){
+      free.push(l);return;
+    }
+    if(inFeats && isBullet){
+      feats.push({name:'',val:l});return;
+    }
+    if(inFeats && l.length<90 && !/[.!?]\s+\w/.test(l)){
+      // kurze Zeile im Merkmalsblock ohne Doppelpunkt -> Merkmal ohne Name
+      feats.push({name:'',val:l});return;
+    }
+    free.push(l);
+  });
+  return {subject:subject,envUser:envUser,feats:feats,free:free};
+}
+
+/* ---------- NEU: Intro - korrigierte Grammatik ---------- */
+function cleanSubject(s){
+  let t=(s||'').trim();
+  t=t.replace(/^auf dem bild ist\s*/i,'');
+  // Trailing Emoji abtrennen, damit der Punkt VOR dem Emoji landet: "sitzt. 🐈" nicht "sitzt. 🐈."
+  let trailingEmoji='';
+  const emMatch=t.match(/(\s*[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F]+)\s*$/u);
+  if(emMatch){trailingEmoji=emMatch[1].trim();t=t.slice(0,emMatch.index).trim();}
+  t=t.replace(/\s*[.!?]+\s*$/,'');
+  // Emoji merken: wird in buildIntro wieder angehaengt
+  cleanSubject._emoji=trailingEmoji;
+  return t.trim();
+}
+function buildIntro(subjectRaw, wantEmoji){
+  let s=cleanSubject(subjectRaw);
+  if(!s) return '';
+  const existingEmoji=cleanSubject._emoji||'';
+  let out='';
+  // Fall: "eine Katze zu sehen, die ..." -> schon korrekt, nur Prefix davor
+  if(/\bzu sehen\b/i.test(s)){
+    out='Auf dem Bild ist '+s+'.';
+  } else {
+    // Fall: "eine Katze, die auf einem Ast sitzt" -> "zu sehen" vor den Relativsatz ziehen
+    const rel=s.match(/^(.*?),\s*(die|der|das)\s+(.+)$/);
+    if(rel){
+      out='Auf dem Bild ist '+rel[1].trim()+' zu sehen, '+rel[2]+' '+rel[3].trim()+'.';
+    } else {
+      out='Auf dem Bild ist '+s+' zu sehen.';
+    }
+  }
+  if(existingEmoji){
+    out+=' '+existingEmoji;
+  } else if(wantEmoji && !hasEmoji(out)){
+    const em=emojiFor(s); if(em) out+=' '+em;
+  }
+  return out;
+}
+function ensurePeriod(s){
+  s=(s||'').trim();
+  if(!s) return s;
+  if(!/[.!?]$/.test(s)) s+='.';
+  return s;
+}
+
+/* ---------- NEU: Beschreibung - NUR Gewollt-Format ---------- */
+const BLOCKED=['Gesamtszene','Hauptmotiv:','Weitere Details','Bildqualitaet','Bildqualität','Zusammenfassung','50mm','f/5.6','Pantograph','Tragender Rumpf','Schaerfentiefe','Schärfentiefe','Farbpalette wird von','hebt sich farblich','Nachweisbar im Bild','Nachbearbeitung','synthetische Generierung','Tragender','Fensterband'];
+function buildDescription(m,raw,opts){
+  const parsed=parseInput(raw);
+  const subject=parsed.subject, envUser=parsed.envUser, feats=parsed.feats, free=parsed.free;
+  const paras=[],bullets=[],warnings=[];
+  let intro='';
+  if(!subject){
+    intro='Das Bild ist eine Aufnahme im '+m.orientation+'. Objektbezeichnungen werden bewusst nicht erfunden - ohne Motivangabe beschreibt dieses Tool nur messbare Bildwerte (siehe Debug).';
+  } else {
+    intro=buildIntro(subject, opts.emoji);
+  }
+  paras.push(intro);
+  // Merkmale - ALLE uebernehmen, nichts kuerzen, keine Pruef-Klammern
+  feats.forEach(function(f){
+    let base='';
+    if(f.name){
+      base=cap(f.name)+': '+cap(f.val);
+    } else {
+      base=cap(f.val);
+    }
+    base=ensurePeriod(base);
+    bullets.push(base);
+    if(m && opts.hints){
+      const w=checkFeatureSilent(f.val,m);
+      if(w.length) warnings.push(f.name? (cap(f.name)+': '+w.join(', ')+' - bitte im Bild pruefen.') : (cap(f.val)+': '+w.join(', ')));
+    } else if(m){
+      // auch ohne Anzeige: Warnung fuer FormatCheck sammeln, aber nur intern
+      const w2=checkFeatureSilent(f.val,m);
+      if(w2.length) warnings.push((f.name?cap(f.name)+': ':'')+w2.join(', ')+' - bitte im Bild pruefen.');
+    }
+  });
+  // Umgebung - nur EINE Zeile, nur aus Nutzerangabe oder als kurze Messwert-Zeile
+  let envLine='';
+  if(envUser){
+    envLine='Umgebung: '+ensurePeriod(cap(envUser));
+  } else if(opts.autoEnv && m && (m.skyPct>=6 || m.vegPct>=8)){
+    const parts=[];
+    if(m.skyPct>=6) parts.push('blaue Farbanteile im oberen Bildbereich (ca. '+fmt0(m.skyPct)+' %)');
+    if(m.vegPct>=8) parts.push('grüne Farbanteile im Bild (ca. '+fmt0(m.vegPct)+' %)');
+    envLine='Umgebung: Messbar sind '+parts.join(' sowie ')+'.';
+  }
+  // Freier Schlusstext - genau so wie eingegeben
+  let freeText='';
+  if(free.length) freeText=free.join(' ');
+  return {paras:paras,bullets:bullets,envLine:envLine,freeText:freeText,warnings:warnings};
+}
+function formatCheckFor(text){
+  const found=BLOCKED.filter(function(b){return text.indexOf(b)!==-1;});
+  return found;
+}
+
+/* ---------- Rendern ---------- */
+function updateCounter(){
+  const p=parseInput(notes.value);
+  const nFeat=p.feats.length;
+  counterEl.textContent=(p.subject?'Motiv erkannt. ':'Kein Motiv - erste Zeile ist das Motiv. ')+'Merkmale: '+nFeat+(p.envUser?' - Umgebung erkannt.':'')+(p.free.length?' - Schlusstext erkannt.':'');
+}
+function run(){
+  updateCounter();
+  try{localStorage.setItem('bildbeschreiber_notes',notes.value);}catch(e){}
+  if(!state.m){
+    output.style.display='block';
+    output.innerHTML='<p style="color:var(--mut)">Bitte zuerst ein Bild laden. Danach wird hier nur das Gewollt-Format erzeugt.</p>';
+    warningsEl.style.display='none';formatEl.style.display='none';
+    state.text='';return;
+  }
+  const opts={emoji:document.getElementById('chkEmoji').checked,hints:document.getElementById('chkHints').checked,autoEnv:document.getElementById('chkAutoEnv').checked};
+  const res=buildDescription(state.m,notes.value,opts);
+  let html='',plain='';
+  html+='<p>'+escapeHtml(res.paras[0])+'</p>';
+  renderClassicalEvidence(state.m);
+  plain+=res.paras[0]+'\n';
+  if(res.bullets.length){
+    html+='<p><strong>Besondere Merkmale:</strong></p><ul>';
+    plain+='\nBesondere Merkmale:\n';
+    res.bullets.forEach(function(b){
+      html+='<li>'+escapeHtml(b)+'</li>'; 
+      plain+='* '+b+'\n';
+    });
+    html+='</ul>';
+  }
+  if(res.envLine){
+    // Umgebung als EINE Zeile wie im Gewollt-Beispiel
+    const envBody=res.envLine.replace(/^Umgebung:\s*/,'');
+    html+='<p><strong>Umgebung:</strong> '+escapeHtml(envBody)+'</p>'; 
+    plain+='\n'+res.envLine+'\n';
+  }
+  if(res.freeText){
+    html+='<p>'+escapeHtml(res.freeText)+'</p>'; 
+    plain+='\n'+res.freeText+'\n';
+  }
+  output.innerHTML=html;
+  output.style.display='block';
+  state.text=plain.trim();
+  // Warnungen - nur wenn Checkbox an, sonst versteckt (Haupttext bleibt sauber)
+  if(opts.hints && res.warnings.length){
+    warningsEl.innerHTML='<strong>Pruefhinweise (nicht Teil der Beschreibung):</strong><br>'+res.warnings.map(function(w){return '&bull; '+escapeHtml(w);}).join('<br>');
+    warningsEl.style.display='block';
+  } else {
+    warningsEl.style.display='none';
+  }
+  // Format-Check - beweist, dass Nicht-gewollt blockiert ist
+  const blockedFound=formatCheckFor(state.text);
+  if(blockedFound.length){
+    formatEl.innerHTML='<strong style="color:var(--err)">Format-Fehler:</strong> Blockierter Begriff gefunden: '+blockedFound.join(', ');
+    formatEl.style.display='block';
+    formatEl.style.background='#2a1515';formatEl.style.borderColor='#5a2a2a';
+  } else {
+    formatEl.innerHTML='<strong style="color:var(--ok)">Gewollt-Check bestanden:</strong> Kein Extra-Abschnitt, keine Kamera-Angabe, keine erfundenen Bauteile, keine Messwert-Saetze, keine Pruef-Klammern im Haupttext. Nur Intro + Merkmale + Umgebung + Schlusssatz.';
+    formatEl.style.display='block';
+    formatEl.style.background='#12321f';formatEl.style.borderColor='#1e5236';
+  }
+  if(!debugEl.hidden) renderDebug();
+}
+function renderDebug(){
+  const m=state.m;if(!m)return;
+  const pos=positionText(m.peak%3,(m.peak/3)|0);
+  const rows=[
+    ['Datei',state.fileName||'-'],
+    ['Dateigroesse',state.fileSize? (Math.round(state.fileSize/1024)+' KB'):'-'],
+    ['Analyse-Aufloesung',m.w+' x '+m.h+' px'],
+    ['Format',m.orientation],
+    ['Ø Helligkeit',fmt1(m.avgL*100)+' %'],
+    ['Kontrast (sigma)',fmt1(m.stdL*100)],
+    ['Schaerfe (Laplace-Varianz)',fmt1(m.sharp)],
+    ['Textur im Motivbereich',fmt1(m.texture)],
+    ['Himmel-Anteil (oben)',fmt1(m.skyPct)+' %'],
+    ['Vegetations-Anteil',fmt1(m.vegPct)+' %'],
+    ['Warm-/Kaltanteil',fmt1(m.warmPct)+' % / '+fmt1(m.coolPct)+' %'],
+    ['Motivposition (nur Debug, nicht im Haupttext)',pos],
+    ['Abstand Motiv/Hintergrund',fmt1(m.subjectDist*100)]
+  ];
+  let html='<h3 style="margin-bottom:6px">Technische Messwerte - nur Debug, nie im Haupttext</h3><table>';
+  rows.forEach(function(r){html+='<tr><td>'+escapeHtml(r[0])+'</td><td>'+escapeHtml(r[1])+'</td></tr>';});
+  html+='</table><h4>Farbpalette</h4><div class="pal">';
+  m.palette.forEach(function(p){
+    html+='<div><span style="background:rgb('+((p.r|0))+','+((p.g|0))+','+((p.b|0))+')"></span>'+escapeHtml(p.name)+' ('+fmt1(p.pct)+' %)</div>';
+  });
+  html+='</div><h4>Signifikanz-Raster (3x3)</h4><div class="grid3">';
+  m.cells.forEach(function(c,i){
+    html+='<div class="'+(i===m.peak?'peak':'')+'" style="background:rgb('+((c.r|0))+','+((c.g|0))+','+((c.b|0))+')">'+Math.round(c.score)+'</div>';
+  });
+  html+='</div><p class="small">Hinweis: Diese Werte beweisen nur, was messbar ist. Sie werden bewusst nicht in die Beschreibung geschrieben.</p>';
+  debugEl.innerHTML=html;
+}
+
+/* ---------- Datei-Handling ---------- */
+function loadFile(file){
+  if(!file||!file.type||!file.type.startsWith('image/'))return;
+  if(state.objectUrl)URL.revokeObjectURL(state.objectUrl);
+  state.fileName=file.name;state.fileSize=file.size;
+  const url=URL.createObjectURL(file);state.objectUrl=url;
+  const img=new Image();
+  img.onload=function(){
+    state.img=img;
+    preview.src=url;preview.style.display='inline-block';
+    dzText.textContent='Anderes Bild hierher ziehen, einfuegen oder klicken';
+    fileInfoEl.textContent='Datei: '+file.name+' - '+Math.round(file.size/1024)+' KB - '+img.naturalWidth+' x '+img.naturalHeight+' px';
+    fileInfoEl.style.display='block';
+    state.m=analyze(img);
+    run();
+  };
+  img.onerror=function(){if(state.objectUrl===url){URL.revokeObjectURL(url);state.objectUrl='';}alert('Bild konnte nicht geladen werden.');};
+  img.src=url;
+}
+dropzone.addEventListener('click',function(){fileInput.click();});
+fileInput.addEventListener('change',function(e){loadFile(e.target.files[0]);});
+['dragover','dragenter'].forEach(function(ev){dropzone.addEventListener(ev,function(e){e.preventDefault();dropzone.classList.add('drag');});});
+['dragleave','drop'].forEach(function(ev){dropzone.addEventListener(ev,function(e){e.preventDefault();dropzone.classList.remove('drag');});});
+dropzone.addEventListener('drop',function(e){loadFile(e.dataTransfer.files[0]);});
+document.addEventListener('paste',function(e){
+  if(!e.clipboardData) return;
+  const items=e.clipboardData.files;
+  if(items && items.length) loadFile(items[0]);
+});
+document.getElementById('btnRemove').addEventListener('click',function(){
+  state.img=null;state.m=null;state.text='';state.fileName='';state.fileSize=0;
+  if(state.objectUrl){URL.revokeObjectURL(state.objectUrl);state.objectUrl='';}fileInput.value='';autoEvidenceEl.style.display='none';
+  preview.style.display='none';preview.src='';
+  fileInfoEl.style.display='none';
+  dzText.textContent='Bild hierher ziehen, per Strg+V einfuegen oder durch Klick auswaehlen';
+  output.style.display='block';
+  output.innerHTML='<p style="color:var(--mut)">Bild entfernt. Bitte ein neues Bild laden.</p>';
+  warningsEl.style.display='none';formatEl.style.display='none';
+});
+document.getElementById('btnClearAll').addEventListener('click',function(){
+  notes.value='';try{localStorage.removeItem('bildbeschreiber_notes');}catch(e){}
+  document.getElementById('btnRemove').click();
+  updateCounter();
+});
+
+/* ---------- Buttons ---------- */
+document.getElementById('btnExample').addEventListener('click',function(){
+  notes.value=[
+    'eine getigerte Hauskatze, die auf einem dicken Ast eines Baumes sitzt',
+    'Fell: braun-grau mit schwarzen Tigerstreifen',
+    'Augen: gro\u00dfe, gelblich-gr\u00fcne Augen',
+    'Ohren: aufrecht und spitz',
+    'Schwanz: lang, dunkel geringelt, nach unten h\u00e4ngend',
+    'Umgebung: Baum mit dichter gr\u00fcner Bl\u00e4tterkrone und blauem Himmel im Hintergrund',
+    'Die Katze schaut direkt in die Kamera. Sie wirkt aufmerksam und neugierig. \uD83E\uDD70'
+  ].join('\n');
+  run();
+});
+document.getElementById('btnExampleTrain').addEventListener('click',function(){
+  notes.value=[
+    'ein gelber Regionalzug, der auf einem Gleis durch eine gr\u00fcne Landschaft f\u00e4hrt',
+    'Farbe: gelb mit wei\u00dfen Fl\u00e4chen',
+    'Form: langgestreckter Triebwagen mit mehreren Fenstern',
+    'Umgebung: gr\u00fcne B\u00e4ume und Gleise im Vordergrund',
+    'Der Zug f\u00e4hrt durch eine nat\u00fcrliche Landschaft.'
+  ].join('\n');
+  run();
+});
+document.getElementById('btnRun').addEventListener('click',run);
+let deb;notes.addEventListener('input',function(){clearTimeout(deb);deb=setTimeout(function(){if(state.m)run();else updateCounter();},400);});
+['chkEmoji','chkHints','chkAutoEnv'].forEach(function(id){document.getElementById(id).addEventListener('change',function(){if(state.m)run();});});
+function fallbackCopy(e,done){const t=document.createElement('textarea');t.value=state.text;document.body.appendChild(t);t.select();const ok=document.execCommand('copy');t.remove();if(ok)done();else e.target.textContent='Kopieren fehlgeschlagen';}
+document.getElementById('btnCopy').addEventListener('click',function(e){
+  if(!state.text)return;
+  const done=function(){e.target.textContent='Kopiert \u2713';setTimeout(function(){e.target.textContent='Text kopieren';},1500);};
+  if(navigator.clipboard && navigator.clipboard.writeText){navigator.clipboard.writeText(state.text).then(done).catch(function(){fallbackCopy(e,done);});}
+  else {fallbackCopy(e,done);}
+});
+function downloadFile(name,content){
+  const blob=new Blob([content],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  URL.revokeObjectURL(a.href);
+}
+document.getElementById('btnSave').addEventListener('click',function(){if(state.text)downloadFile('bildbeschreibung.txt',state.text);});
+document.getElementById('btnSaveMd').addEventListener('click',function(){if(state.text)downloadFile('bildbeschreibung.md','# Bildbeschreibung\n\n'+state.text+'\n');});
+document.getElementById('btnDebug').addEventListener('click',function(){
+  debugEl.hidden=!debugEl.hidden;
+  debugEl.style.display=debugEl.hidden?'none':'block';
+  if(!debugEl.hidden)renderDebug();
+});
+/* Gespeicherte Eingabe wiederherstellen */
+try{
+  const saved=localStorage.getItem('bildbeschreiber_notes');
+  if(saved){notes.value=saved;}
+}catch(e){}
+updateCounter();
+</script>
+</body>
+</html>
